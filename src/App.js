@@ -6,7 +6,7 @@ function App() {
   return (
     <div className="App">
       <div className="container">
-        <h1>Football Live Messages</h1>
+        <h1>Football Focus</h1>
         <WebSocketClient />
       </div>
     </div>

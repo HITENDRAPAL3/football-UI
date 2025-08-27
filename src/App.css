@@ -36,3 +36,49 @@
     transform: rotate(360deg);
   }
 }
+
+/* WebSocket Client Styles */
+.connection-status {
+  padding: 10px;
+  border-radius: 5px;
+  margin-bottom: 15px;
+  font-weight: bold;
+}
+
+.connection-status.connected {
+  background-color: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.connection-status.disconnected {
+  background-color: #f8d7da;
+  color: #721c24;
+  border: 1px solid #f5c6cb;
+}
+
+/* Live containers responsive styles */
+.live-containers {
+  width: 100%;
+  max-width: 100%;
+}
+
+.events-container,
+.comments-container {
+  width: 100%;
+  overflow: hidden;
+}
+
+/* Responsive design for smaller screens */
+@media (max-width: 768px) {
+  .live-containers {
+    flex-direction: column !important;
+    gap: 15px !important;
+  }
+  
+  .events-container,
+  .comments-container {
+    max-width: 100% !important;
+    min-width: auto !important;
+  }
+}
