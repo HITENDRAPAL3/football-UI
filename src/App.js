@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import WebSocketClient from './components/WebSocketClient';
 import AdminDashboard from './components/AdminDashboard';
 import UserDashboard from './components/UserDashboard';
 import './App.css';
 
 function App() {
-  const [activeTab, setActiveTab] = useState('websocket');
   const [userRole, setUserRole] = useState('user'); // 'admin' or 'user'
 
   return (
@@ -19,10 +17,7 @@ function App() {
             <label>Login as:</label>
             <select 
               value={userRole} 
-              onChange={(e) => {
-                setUserRole(e.target.value);
-                setActiveTab('websocket'); // Reset to default tab when role changes
-              }}
+              onChange={(e) => setUserRole(e.target.value)}
               className="role-select"
             >
               <option value="user">User</option>
@@ -31,37 +26,9 @@ function App() {
           </div>
         </div>
         
-        {/* Navigation Tabs */}
-        <div className="nav-tabs">
-          <button 
-            className={`nav-tab ${activeTab === 'websocket' ? 'active' : ''}`}
-            onClick={() => setActiveTab('websocket')}
-          >
-            Live WebSocket
-          </button>
-          
-          {userRole === 'admin' ? (
-            <button 
-              className={`nav-tab ${activeTab === 'admin' ? 'active' : ''}`}
-              onClick={() => setActiveTab('admin')}
-            >
-              Admin Dashboard
-            </button>
-          ) : (
-            <button 
-              className={`nav-tab ${activeTab === 'user' ? 'active' : ''}`}
-              onClick={() => setActiveTab('user')}
-            >
-              Matches & Comments
-            </button>
-          )}
-        </div>
-
-        {/* Content based on active tab and role */}
-        <div className="tab-content">
-          {activeTab === 'websocket' && <WebSocketClient />}
-          {activeTab === 'admin' && userRole === 'admin' && <AdminDashboard />}
-          {activeTab === 'user' && userRole === 'user' && <UserDashboard />}
+        {/* Role-based Dashboard */}
+        <div className="dashboard-content">
+          {userRole === 'admin' ? <AdminDashboard /> : <UserDashboard />}
         </div>
       </div>
     </div>

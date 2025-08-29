@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import matchService from '../services/matchService';
+import SockJS from 'sockjs-client';
+import { Stomp } from '@stomp/stompjs';
 
 const AdminDashboard = () => {
   const [currentMatch, setCurrentMatch] = useState(null);
@@ -23,6 +25,124 @@ const AdminDashboard = () => {
   const [eventTeam, setEventTeam] = useState('');
   const [eventPlayer, setEventPlayer] = useState('');
   const [additionalInfo, setAdditionalInfo] = useState('');
+
+  // WebSocket states
+  const [connected, setConnected] = useState(false);
+  const [liveEvents, setLiveEvents] = useState([]);
+  const [liveComments, setLiveComments] = useState([]);
+  const [quickMessage, setQuickMessage] = useState('');
+  const [sending, setSending] = useState(false);
+  const stompClientRef = useRef(null);
+
+  const WEBSOCKET_URL = 'http://localhost:8081/ws';
+
+  // WebSocket connection effect - don't auto-connect, let user control
+  useEffect(() => {
+    // Don't auto-connect, let user control the connection
+    return () => {
+      disconnectWebSocket();
+    };
+  }, []);
+
+  // WebSocket connection functions
+  const connectWebSocket = () => {
+    if (connected || stompClientRef.current) {
+      showMessage('Already connected or connecting...', 'warning');
+      return;
+    }
+
+    try {
+      showMessage('Connecting to live feed...', 'success');
+      const socket = new SockJS(WEBSOCKET_URL);
+      const stompClient = Stomp.over(socket);
+      stompClient.debug = () => {};
+
+      stompClient.connect(
+        {},
+        (frame) => {
+          console.log('Admin Dashboard connected to WebSocket:', frame);
+          setConnected(true);
+          stompClientRef.current = stompClient;
+          showMessage('Live feed connected successfully!', 'success');
+
+          // Subscribe to match events
+          stompClient.subscribe('/topic/matchEvents', (message) => {
+            const receivedMessage = {
+              content: message.body,
+              timestamp: new Date().toLocaleTimeString(),
+              id: Date.now() + Math.random(),
+              type: 'live_event'
+            };
+            setLiveEvents(prevEvents => [...prevEvents, receivedMessage]);
+          });
+
+          // Subscribe to match comments
+          stompClient.subscribe('/topic/matchComments', (message) => {
+            const receivedMessage = {
+              content: message.body,
+              timestamp: new Date().toLocaleTimeString(),
+              id: Date.now() + Math.random(),
+              type: 'live_comment'
+            };
+            setLiveComments(prevComments => [...prevComments, receivedMessage]);
+          });
+        },
+        (error) => {
+          console.error('Admin WebSocket connection error:', error);
+          setConnected(false);
+          stompClientRef.current = null;
+          showMessage('Failed to connect to live feed. Make sure WebSocket server is running on port 8081.', 'error');
+        }
+      );
+    } catch (error) {
+      console.error('Error creating WebSocket connection:', error);
+      setConnected(false);
+      showMessage('Error connecting to live feed: ' + error.message, 'error');
+    }
+  };
+
+  const disconnectWebSocket = () => {
+    if (stompClientRef.current) {
+      stompClientRef.current.disconnect();
+      stompClientRef.current = null;
+      setConnected(false);
+      showMessage('Disconnected from live feed', 'success');
+      console.log('Admin Dashboard disconnected from WebSocket');
+    }
+  };
+
+  const clearLiveFeeds = () => {
+    setLiveEvents([]);
+    setLiveComments([]);
+  };
+
+  // Quick event sending (for testing/quick admin actions)
+  const sendQuickEvent = async () => {
+    if (!quickMessage.trim() || sending) return;
+    
+    setSending(true);
+    try {
+      const matchEvent = {
+        matchId: parseInt(matchId) || 1,
+        eventId: null,
+        timestamp: new Date().toISOString(),
+        minute: Math.floor(Math.random() * 90) + 1,
+        eventtype: 'ADMIN_NOTE',
+        team: null,
+        player: 'Admin',
+        description: quickMessage.trim(),
+        additionalInfo: 'Quick admin message'
+      };
+
+      await matchService.addMatchEvent(matchId || '1', matchEvent);
+      showMessage('Quick event sent successfully!', 'success');
+      setQuickMessage('');
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+    } finally {
+      setSending(false);
+    }
+  };
 
   // Clear form and messages
   const clearForm = () => {
@@ -246,7 +366,21 @@ const AdminDashboard = () => {
 
   return (
     <div className="match-details-manager">
-      <h2>Admin Dashboard</h2>
+      <div className="dashboard-header">
+        <h2>Admin Dashboard</h2>
+        <div className="connection-controls">
+          <div className={`connection-status ${connected ? 'connected' : 'disconnected'}`}>
+            Live Feed: {connected ? 'Connected' : 'Disconnected'}
+          </div>
+          <button 
+            onClick={connected ? disconnectWebSocket : connectWebSocket}
+            className={`btn btn-sm ${connected ? 'btn-danger' : 'btn-success'}`}
+            disabled={loading}
+          >
+            {connected ? 'Disconnect' : 'Connect Live Feed'}
+          </button>
+        </div>
+      </div>
 
       {/* Message Display */}
       {message && (
@@ -254,6 +388,36 @@ const AdminDashboard = () => {
           {message}
         </div>
       )}
+
+      {/* Quick Admin Actions */}
+      <div className="form-section">
+        <h3>Quick Admin Actions</h3>
+        <div className="quick-actions">
+          <div className="input-group">
+            <input
+              type="text"
+              placeholder="Quick admin message or event..."
+              value={quickMessage}
+              onChange={(e) => setQuickMessage(e.target.value)}
+              className="form-input"
+              onKeyPress={(e) => e.key === 'Enter' && sendQuickEvent()}
+            />
+            <button 
+              onClick={sendQuickEvent}
+              disabled={sending || !quickMessage.trim()}
+              className="btn btn-warning"
+            >
+              {sending ? 'Sending...' : 'Quick Event'}
+            </button>
+            <button 
+              onClick={clearLiveFeeds}
+              className="btn btn-secondary"
+            >
+              Clear Live Feeds
+            </button>
+          </div>
+        </div>
+      </div>
 
       {/* Match ID Input */}
       <div className="form-section">
@@ -601,10 +765,52 @@ const AdminDashboard = () => {
         </button>
       </div>
 
+      {/* Live Feeds */}
+      <div className="live-feeds-section">
+        <h3>Live Match Feeds</h3>
+        <div className="live-feeds-container">
+          {/* Live Events Feed */}
+          <div className="live-feed events-feed">
+            <h4>⚽ Live Events ({liveEvents.length})</h4>
+            <div className="feed-content">
+              {liveEvents.length === 0 ? (
+                <p className="no-content">No live events yet...</p>
+              ) : (
+                liveEvents.slice(-10).map((event) => (
+                  <div key={event.id} className="feed-item event-feed-item">
+                    <div className="feed-timestamp">{event.timestamp}</div>
+                    <div className="feed-content-text">{event.content}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Live Comments Feed */}
+          <div className="live-feed comments-feed">
+            <h4>💬 Live Comments ({liveComments.length})</h4>
+            <div className="feed-content">
+              {liveComments.length === 0 ? (
+                <p className="no-content">No live comments yet...</p>
+              ) : (
+                liveComments.slice(-10).map((comment) => (
+                  <div key={comment.id} className="feed-item comment-feed-item">
+                    <div className="feed-timestamp">{comment.timestamp}</div>
+                    <div className="feed-content-text">{comment.content}</div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Help Section */}
       <div className="help-section">
         <h4>Admin Instructions:</h4>
         <ul>
+          <li><strong>Quick Actions:</strong> Use the quick message input to send admin events instantly</li>
+          <li><strong>Live Feeds:</strong> Monitor real-time events and comments from all users</li>
           <li><strong>Match Management:</strong></li>
           <ul>
             <li><strong>Get:</strong> Enter Match ID and click "Get Match" to load existing data</li>
