@@ -76,16 +76,26 @@ const AdminDashboard = () => {
             setLiveEvents(prevEvents => [...prevEvents, receivedMessage]);
           });
 
-          // Subscribe to match comments
-          stompClient.subscribe('/topic/matchComments', (message) => {
-            const receivedMessage = {
-              content: message.body,
-              timestamp: new Date().toLocaleTimeString(),
-              id: Date.now() + Math.random(),
-              type: 'live_comment'
-            };
-            setLiveComments(prevComments => [...prevComments, receivedMessage]);
-          });
+                  // Subscribe to match comments
+        stompClient.subscribe('/topic/matchComments', (message) => {
+          const receivedMessage = {
+            content: message.body,
+            timestamp: new Date().toLocaleTimeString(),
+            id: Date.now() + Math.random(),
+            type: 'live_comment'
+          };
+          
+          // Add to global live comments feed
+          setLiveComments(prevComments => [...prevComments, receivedMessage]);
+          
+          // Enhanced parsing for admin dashboard monitoring
+          try {
+            const commentData = JSON.parse(message.body);
+            console.log(`Admin: New comment received for match ${commentData.matchid} by ${commentData.username}`);
+          } catch (error) {
+            console.log('Admin: Comment data format not parseable');
+          }
+        });
         },
         (error) => {
           console.error('Admin WebSocket connection error:', error);
@@ -796,7 +806,16 @@ const AdminDashboard = () => {
                 liveComments.slice(-10).map((comment) => (
                   <div key={comment.id} className="feed-item comment-feed-item">
                     <div className="feed-timestamp">{comment.timestamp}</div>
-                    <div className="feed-content-text">{comment.content}</div>
+                    <div className="feed-content-text">
+                      {(() => {
+                        try {
+                          const commentData = JSON.parse(comment.content);
+                          return `[Match ${commentData.matchid}] ${commentData.username} (⭐${commentData.rating}): ${commentData.text}`;
+                        } catch {
+                          return comment.content;
+                        }
+                      })()}
+                    </div>
                   </div>
                 ))
               )}

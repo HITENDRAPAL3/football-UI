@@ -70,16 +70,30 @@ const UserDashboard = () => {
             setLiveEvents(prevEvents => [...prevEvents, receivedMessage]);
           });
 
-          // Subscribe to match comments
-          stompClient.subscribe('/topic/matchComments', (message) => {
-            const receivedMessage = {
-              content: message.body,
-              timestamp: new Date().toLocaleTimeString(),
-              id: Date.now() + Math.random(),
-              type: 'live_comment'
-            };
-            setLiveComments(prevComments => [...prevComments, receivedMessage]);
-          });
+                  // Subscribe to match comments
+        stompClient.subscribe('/topic/matchComments', (message) => {
+          const receivedMessage = {
+            content: message.body,
+            timestamp: new Date().toLocaleTimeString(),
+            id: Date.now() + Math.random(),
+            type: 'live_comment'
+          };
+          
+          // Add to global live comments feed
+          setLiveComments(prevComments => [...prevComments, receivedMessage]);
+          
+          // If viewing a specific match and this comment is for that match, add to match comments
+          try {
+            const commentData = JSON.parse(message.body);
+            if (selectedMatch && commentData.matchid === selectedMatch.matchId) {
+              setComments(prevComments => [...prevComments, commentData]);
+              showMessage(`New comment added by ${commentData.username}`, 'success');
+            }
+          } catch (error) {
+            // If parsing fails, the message might be in different format
+            console.log('Could not parse comment data for match-specific update');
+          }
+        });
         },
         (error) => {
           console.error('User WebSocket connection error:', error);
@@ -130,6 +144,11 @@ const UserDashboard = () => {
       };
 
       await matchService.addComment(selectedMatchId || '1', matchComment);
+      
+      // If we're viewing a specific match and the quick comment is for that match, add it to the comments
+      if (showMatchDetails && selectedMatch && (parseInt(selectedMatchId) || 1) === selectedMatch.matchId) {
+        setComments(prevComments => [...prevComments, matchComment]);
+      }
       showMessage('Quick comment sent successfully!', 'success');
       setQuickComment('');
     } catch (error) {
@@ -215,8 +234,18 @@ const UserDashboard = () => {
       showMessage('Comment added successfully!', 'success');
       setNewComment('');
       
-      // Refresh comments
-      await handleGetComments(selectedMatchId);
+      // Add comment immediately to local state for instant feedback
+      setComments(prevComments => [...prevComments, matchComment]);
+      
+      // Also refresh comments after a short delay to ensure we have the latest from server
+      setTimeout(async () => {
+        try {
+          const refreshedComments = await matchService.getComments(selectedMatchId);
+          setComments(refreshedComments);
+        } catch (error) {
+          console.log('Could not refresh comments:', error.message);
+        }
+      }, 1000);
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
     } finally {
@@ -599,18 +628,55 @@ const UserDashboard = () => {
 
           {/* Live Comments Feed */}
           <div className="live-feed comments-feed">
-            <h4>💬 Live Comments ({liveComments.length})</h4>
+            <h4>💬 Live Comments {showMatchDetails && selectedMatch ? `for ${selectedMatch.homeTeamName} vs ${selectedMatch.awayTeamName}` : ''} ({
+              showMatchDetails && selectedMatch 
+                ? liveComments.filter(comment => {
+                    try {
+                      const commentData = JSON.parse(comment.content);
+                      return commentData.matchid === selectedMatch.matchId;
+                    } catch {
+                      return false;
+                    }
+                  }).length
+                : liveComments.length
+            })</h4>
             <div className="feed-content">
-              {liveComments.length === 0 ? (
-                <p className="no-content">No live comments yet...</p>
-              ) : (
-                liveComments.slice(-10).map((comment) => (
-                  <div key={comment.id} className="feed-item comment-feed-item">
-                    <div className="feed-timestamp">{comment.timestamp}</div>
-                    <div className="feed-content-text">{comment.content}</div>
-                  </div>
-                ))
-              )}
+              {(() => {
+                const displayComments = showMatchDetails && selectedMatch 
+                  ? liveComments.filter(comment => {
+                      try {
+                        const commentData = JSON.parse(comment.content);
+                        return commentData.matchid === selectedMatch.matchId;
+                      } catch {
+                        return false;
+                      }
+                    })
+                  : liveComments;
+                
+                return displayComments.length === 0 ? (
+                  <p className="no-content">
+                    {showMatchDetails && selectedMatch 
+                      ? 'No live comments for this match yet...' 
+                      : 'No live comments yet...'}
+                  </p>
+                ) : (
+                  displayComments.slice(-10).map((comment) => (
+                    <div key={comment.id} className="feed-item comment-feed-item">
+                      <div className="feed-timestamp">{comment.timestamp}</div>
+                      <div className="feed-content-text">
+                        {(() => {
+                          try {
+                            const commentData = JSON.parse(comment.content);
+                            return `${commentData.username}: ${commentData.text}`;
+                          } catch {
+                            return comment.content;
+                          }
+                        })()}
+                      </div>
+                    </div>
+                  ))
+                );
+              })()}
             </div>
           </div>
         </div>
@@ -622,16 +688,11 @@ const UserDashboard = () => {
         <ul>
           <li><strong>Quick Comment:</strong> Use the quick comment section to instantly share your thoughts</li>
           <li><strong>Live Feeds:</strong> Watch real-time match events and comments from other users</li>
-          <li><strong>View Matches:</strong> Click "Load All Matches" to see all available matches</li>
-          <li><strong>View Comments:</strong> Click "View Comments" on any match card to see existing comments with ratings and usernames</li>
-          <li><strong>Add Comment:</strong> Fill in all required fields:</li>
-          <ul>
-            <li>Match ID (required)</li>
-            <li>Username (required)</li>
-            <li>Rating (1-5 stars)</li>
-            <li>Comment text (required)</li>
-          </ul>
-          <li><strong>Quick Comment:</strong> Click "Add Comment" on a match card to auto-fill the Match ID and scroll to the form</li>
+          <li><strong>Real-time Comments:</strong> When viewing a match detail, see comments from other users appear instantly</li>
+          <li><strong>View Matches:</strong> Click "Load All Matches" to see matches separated by Live and Upcoming status</li>
+          <li><strong>Match Details:</strong> Click "View Match Details" to see the match score and add comments</li>
+          <li><strong>Add Comment:</strong> In match detail view, the Match ID is auto-filled. Just enter username, rating, and comment</li>
+          <li><strong>Connect Live Feed:</strong> Click "Connect Live Feed" to receive real-time updates from other users</li>
         </ul>
       </div>
     </div>
