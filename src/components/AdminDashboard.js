@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import matchService from '../services/matchService';
 
-const MatchDetailsManager = () => {
+const AdminDashboard = () => {
   const [currentMatch, setCurrentMatch] = useState(null);
-  const [allMatches, setAllMatches] = useState([]); // New state for all matches
+  const [allMatches, setAllMatches] = useState([]);
+  const [matchEvents, setMatchEvents] = useState([]);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
@@ -14,6 +15,11 @@ const MatchDetailsManager = () => {
   const [homeTeamScore, setHomeTeamScore] = useState('');
   const [awayTeamName, setAwayTeamName] = useState('');
   const [awayTeamScore, setAwayTeamScore] = useState('');
+  
+  // Match Event form states
+  const [eventType, setEventType] = useState('GOAL');
+  const [eventDescription, setEventDescription] = useState('');
+  const [eventMinute, setEventMinute] = useState('');
 
   // Clear form and messages
   const clearForm = () => {
@@ -24,6 +30,13 @@ const MatchDetailsManager = () => {
     setAwayTeamScore('');
     setCurrentMatch(null);
     setMessage('');
+  };
+
+  // Clear event form
+  const clearEventForm = () => {
+    setEventType('GOAL');
+    setEventDescription('');
+    setEventMinute('');
   };
 
   // Show message with auto-hide
@@ -168,9 +181,59 @@ const MatchDetailsManager = () => {
     }
   };
 
+  // Add match event
+  const handleAddMatchEvent = async () => {
+    if (!matchId.trim() || !eventDescription.trim() || !eventMinute.trim()) {
+      showMessage('Please fill in all event fields', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const eventDetails = {
+        eventType,
+        description: eventDescription.trim(),
+        minute: parseInt(eventMinute)
+      };
+
+      await matchService.addMatchEvent(matchId, eventDetails);
+      showMessage('Match event added successfully!', 'success');
+      clearEventForm();
+      
+      // Refresh events if currently viewing this match's events
+      if (matchEvents.length > 0) {
+        await handleGetMatchEvents();
+      }
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get match events
+  const handleGetMatchEvents = async () => {
+    if (!matchId.trim()) {
+      showMessage('Please enter a match ID', 'error');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const events = await matchService.getMatchEvents(matchId);
+      setMatchEvents(events);
+      showMessage(`Loaded ${events.length} events for match ${matchId}`, 'success');
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+      setMatchEvents([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="match-details-manager">
-      <h2>Match Details Management</h2>
+      <h2>Admin Dashboard</h2>
 
       {/* Message Display */}
       {message && (
@@ -327,6 +390,111 @@ const MatchDetailsManager = () => {
         </div>
       </div>
 
+      {/* Match Events Section */}
+      <div className="form-section">
+        <h3>Match Events Management</h3>
+        
+        {/* Get Events */}
+        <div className="input-group">
+          <button 
+            onClick={handleGetMatchEvents}
+            disabled={loading}
+            className="btn btn-info"
+          >
+            {loading ? 'Loading...' : 'Get Match Events'}
+          </button>
+          {matchEvents.length > 0 && (
+            <button 
+              onClick={() => setMatchEvents([])}
+              disabled={loading}
+              className="btn btn-secondary"
+            >
+              Clear Events
+            </button>
+          )}
+        </div>
+
+        {/* Event Form */}
+        <div className="event-form">
+          <h4>Add New Event</h4>
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Event Type</label>
+              <select
+                value={eventType}
+                onChange={(e) => setEventType(e.target.value)}
+                className="form-input"
+              >
+                <option value="GOAL">Goal</option>
+                <option value="YELLOW_CARD">Yellow Card</option>
+                <option value="RED_CARD">Red Card</option>
+                <option value="SUBSTITUTION">Substitution</option>
+                <option value="CORNER">Corner</option>
+                <option value="FOUL">Foul</option>
+                <option value="OFFSIDE">Offside</option>
+              </select>
+</div>
+            
+            <div className="form-group">
+              <label>Minute</label>
+              <input
+                type="number"
+                placeholder="Match minute"
+                value={eventMinute}
+                onChange={(e) => setEventMinute(e.target.value)}
+                className="form-input"
+                min="1"
+                max="120"
+              />
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label>Event Description</label>
+            <textarea
+              placeholder="Enter event description"
+              value={eventDescription}
+              onChange={(e) => setEventDescription(e.target.value)}
+              className="form-input event-textarea"
+              rows="3"
+            />
+          </div>
+          
+          <div className="event-actions">
+            <button 
+              onClick={handleAddMatchEvent}
+              disabled={loading}
+              className="btn btn-success"
+            >
+              {loading ? 'Adding...' : 'Add Event'}
+            </button>
+            <button 
+              onClick={clearEventForm}
+              disabled={loading}
+              className="btn btn-secondary"
+            >
+              Clear Event Form
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Match Events Display */}
+      {matchEvents.length > 0 && (
+        <div className="events-display">
+          <h3>Match Events ({matchEvents.length})</h3>
+          <div className="events-list">
+            {matchEvents.map((event, index) => (
+              <div key={index} className="event-item">
+                <div className="event-minute">{event.minute}'</div>
+                <div className="event-type">{event.eventType}</div>
+                <div className="event-description">{event.description}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="action-buttons">
         <button 
@@ -364,17 +532,25 @@ const MatchDetailsManager = () => {
 
       {/* Help Section */}
       <div className="help-section">
-        <h4>Instructions:</h4>
+        <h4>Admin Instructions:</h4>
         <ul>
-          <li><strong>Get:</strong> Enter Match ID and click "Get Match" to load existing data</li>
-          <li><strong>Get All:</strong> Click "Get All Matches" to load and display all matches. Click "Load Match" on any card to edit it</li>
-          <li><strong>Add:</strong> Fill in Match ID, team names (required), and scores (optional), then click "Add Match"</li>
-          <li><strong>Update:</strong> Enter Match ID, modify any fields you want to change, then click "Update Match"</li>
-          <li><strong>Delete:</strong> Enter Match ID and click "Delete Match" (confirmation required)</li>
+          <li><strong>Match Management:</strong></li>
+          <ul>
+            <li><strong>Get:</strong> Enter Match ID and click "Get Match" to load existing data</li>
+            <li><strong>Get All:</strong> Click "Get All Matches" to load and display all matches. Click "Load Match" on any card to edit it</li>
+            <li><strong>Add:</strong> Fill in Match ID, team names (required), and scores (optional), then click "Add Match"</li>
+            <li><strong>Update:</strong> Enter Match ID, modify any fields you want to change, then click "Update Match"</li>
+            <li><strong>Delete:</strong> Enter Match ID and click "Delete Match" (confirmation required)</li>
+          </ul>
+          <li><strong>Match Events:</strong></li>
+          <ul>
+            <li><strong>Get Events:</strong> Enter Match ID and click "Get Match Events" to view all events for that match</li>
+            <li><strong>Add Event:</strong> Fill in event details and click "Add Event" to record a new match event</li>
+          </ul>
         </ul>
       </div>
     </div>
   );
 };
 
-export default MatchDetailsManager;
+export default AdminDashboard;

@@ -108,6 +108,92 @@ class MatchService {
       throw error;
     }
   }
+
+  // Add match event (Admin only)
+  async addMatchEvent(matchId, eventDetails) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/addMatchEvent?matchId=${matchId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(eventDetails),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to add match event: ${response.status}`);
+      }
+      
+      return await response.text();
+    } catch (error) {
+      console.error('Error adding match event:', error);
+      throw error;
+    }
+  }
+
+  // Get match events
+  async getMatchEvents(matchId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/getMatchEvents?matchId=${matchId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get match events: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting match events:', error);
+      throw error;
+    }
+  }
+
+  // Add comment (User)
+  async addComment(matchId, comment) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/addComment?matchId=${matchId}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ comment }),
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to add comment: ${response.status}`);
+      }
+      
+      return await response.text();
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      throw error;
+    }
+  }
+
+  // Get comments
+  async getComments(matchId) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/getComments?matchId=${matchId}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get comments: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting comments:', error);
+      throw error;
+    }
+  }
 }
 
 export default new MatchService();
