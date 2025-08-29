@@ -20,6 +20,9 @@ const AdminDashboard = () => {
   const [eventType, setEventType] = useState('GOAL');
   const [eventDescription, setEventDescription] = useState('');
   const [eventMinute, setEventMinute] = useState('');
+  const [eventTeam, setEventTeam] = useState('');
+  const [eventPlayer, setEventPlayer] = useState('');
+  const [additionalInfo, setAdditionalInfo] = useState('');
 
   // Clear form and messages
   const clearForm = () => {
@@ -37,6 +40,9 @@ const AdminDashboard = () => {
     setEventType('GOAL');
     setEventDescription('');
     setEventMinute('');
+    setEventTeam('');
+    setEventPlayer('');
+    setAdditionalInfo('');
   };
 
   // Show message with auto-hide
@@ -184,19 +190,26 @@ const AdminDashboard = () => {
   // Add match event
   const handleAddMatchEvent = async () => {
     if (!matchId.trim() || !eventDescription.trim() || !eventMinute.trim()) {
-      showMessage('Please fill in all event fields', 'error');
+      showMessage('Please fill in required fields: Match ID, Description, and Minute', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      const eventDetails = {
-        eventType,
+      // Create MatchEvent object with all required and optional fields
+      const matchEvent = {
+        matchId: parseInt(matchId),
+        eventId: null, // Backend will generate this
+        timestamp: new Date().toISOString(),
+        minute: parseInt(eventMinute),
+        eventtype: eventType,
+        team: eventTeam.trim() || null,
+        player: eventPlayer.trim() || null,
         description: eventDescription.trim(),
-        minute: parseInt(eventMinute)
+        additionalInfo: additionalInfo.trim() || null
       };
 
-      await matchService.addMatchEvent(matchId, eventDetails);
+      await matchService.addMatchEvent(matchId, matchEvent);
       showMessage('Match event added successfully!', 'success');
       clearEventForm();
       
@@ -419,7 +432,7 @@ const AdminDashboard = () => {
           <h4>Add New Event</h4>
           <div className="form-grid">
             <div className="form-group">
-              <label>Event Type</label>
+              <label>Event Type*</label>
               <select
                 value={eventType}
                 onChange={(e) => setEventType(e.target.value)}
@@ -432,11 +445,14 @@ const AdminDashboard = () => {
                 <option value="CORNER">Corner</option>
                 <option value="FOUL">Foul</option>
                 <option value="OFFSIDE">Offside</option>
+                <option value="KICK_OFF">Kick Off</option>
+                <option value="HALF_TIME">Half Time</option>
+                <option value="FULL_TIME">Full Time</option>
               </select>
-</div>
+            </div>
             
             <div className="form-group">
-              <label>Minute</label>
+              <label>Minute*</label>
               <input
                 type="number"
                 placeholder="Match minute"
@@ -445,18 +461,53 @@ const AdminDashboard = () => {
                 className="form-input"
                 min="1"
                 max="120"
+                required
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Team</label>
+              <input
+                type="text"
+                placeholder="Team name (optional)"
+                value={eventTeam}
+                onChange={(e) => setEventTeam(e.target.value)}
+                className="form-input"
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Player</label>
+              <input
+                type="text"
+                placeholder="Player name (optional)"
+                value={eventPlayer}
+                onChange={(e) => setEventPlayer(e.target.value)}
+                className="form-input"
               />
             </div>
           </div>
           
           <div className="form-group">
-            <label>Event Description</label>
+            <label>Event Description*</label>
             <textarea
-              placeholder="Enter event description"
+              placeholder="Enter detailed event description"
               value={eventDescription}
               onChange={(e) => setEventDescription(e.target.value)}
               className="form-input event-textarea"
               rows="3"
+              required
+            />
+          </div>
+          
+          <div className="form-group">
+            <label>Additional Info</label>
+            <textarea
+              placeholder="Additional information (optional)"
+              value={additionalInfo}
+              onChange={(e) => setAdditionalInfo(e.target.value)}
+              className="form-input event-textarea"
+              rows="2"
             />
           </div>
           
@@ -485,10 +536,30 @@ const AdminDashboard = () => {
           <h3>Match Events ({matchEvents.length})</h3>
           <div className="events-list">
             {matchEvents.map((event, index) => (
-              <div key={index} className="event-item">
-                <div className="event-minute">{event.minute}'</div>
-                <div className="event-type">{event.eventType}</div>
-                <div className="event-description">{event.description}</div>
+              <div key={event.eventId || index} className="event-item">
+                <div className="event-main">
+                  <div className="event-minute">{event.minute}'</div>
+                  <div className="event-type">{event.eventtype || event.eventType}</div>
+                  <div className="event-description">{event.description}</div>
+                </div>
+                {(event.team || event.player || event.additionalInfo) && (
+                  <div className="event-details">
+                    {event.team && (
+                      <span className="event-team">Team: {event.team}</span>
+                    )}
+                    {event.player && (
+                      <span className="event-player">Player: {event.player}</span>
+                    )}
+                    {event.additionalInfo && (
+                      <span className="event-additional">Info: {event.additionalInfo}</span>
+                    )}
+                    {event.timestamp && (
+                      <span className="event-timestamp">
+                        {new Date(event.timestamp).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -545,7 +616,8 @@ const AdminDashboard = () => {
           <li><strong>Match Events:</strong></li>
           <ul>
             <li><strong>Get Events:</strong> Enter Match ID and click "Get Match Events" to view all events for that match</li>
-            <li><strong>Add Event:</strong> Fill in event details and click "Add Event" to record a new match event</li>
+            <li><strong>Add Event:</strong> Fill in event details and click "Add Event". Required fields: Event Type, Minute, Description. Optional: Team, Player, Additional Info</li>
+            <li><strong>Event Types:</strong> Goal, Yellow Card, Red Card, Substitution, Corner, Foul, Offside, Kick Off, Half Time, Full Time</li>
           </ul>
         </ul>
       </div>

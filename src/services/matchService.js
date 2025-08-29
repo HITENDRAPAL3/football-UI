@@ -110,14 +110,14 @@ class MatchService {
   }
 
   // Add match event (Admin only)
-  async addMatchEvent(matchId, eventDetails) {
+  async addMatchEvent(matchId, matchEvent) {
     try {
       const response = await fetch(`${API_BASE_URL}/addMatchEvent?matchId=${matchId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(eventDetails),
+        body: JSON.stringify(matchEvent),
       });
       
       if (!response.ok) {
@@ -153,14 +153,14 @@ class MatchService {
   }
 
   // Add comment (User)
-  async addComment(matchId, comment) {
+  async addComment(matchId, matchComment) {
     try {
       const response = await fetch(`${API_BASE_URL}/addComment?matchId=${matchId}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ comment }),
+        body: JSON.stringify(matchComment),
       });
       
       if (!response.ok) {

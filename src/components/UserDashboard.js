@@ -11,6 +11,8 @@ const UserDashboard = () => {
   // Comment form states
   const [selectedMatchId, setSelectedMatchId] = useState('');
   const [newComment, setNewComment] = useState('');
+  const [username, setUsername] = useState('');
+  const [rating, setRating] = useState(5);
 
   // Show message with auto-hide
   const showMessage = (msg, type) => {
@@ -55,14 +57,25 @@ const UserDashboard = () => {
 
   // Add comment
   const handleAddComment = async () => {
-    if (!selectedMatchId || !newComment.trim()) {
-      showMessage('Please select a match and enter a comment', 'error');
+    if (!selectedMatchId || !newComment.trim() || !username.trim()) {
+      showMessage('Please fill in all required fields (Match ID, Username, Comment)', 'error');
       return;
     }
 
     setLoading(true);
     try {
-      await matchService.addComment(selectedMatchId, newComment.trim());
+      // Create MatchComment object with all required fields
+      const matchComment = {
+        commentid: null, // Backend will generate this
+        matchid: parseInt(selectedMatchId),
+        userid: null, // Could be generated or user-provided in a real system
+        username: username.trim(),
+        text: newComment.trim(),
+        timestamp: new Date().toISOString(),
+        rating: rating
+      };
+
+      await matchService.addComment(selectedMatchId, matchComment);
       showMessage('Comment added successfully!', 'success');
       setNewComment('');
       
@@ -79,6 +92,8 @@ const UserDashboard = () => {
   const clearCommentForm = () => {
     setSelectedMatchId('');
     setNewComment('');
+    setUsername('');
+    setRating(5);
     setComments([]);
   };
 
@@ -144,7 +159,11 @@ const UserDashboard = () => {
                     View Comments
                   </button>
                   <button 
-                    onClick={() => setSelectedMatchId(match.matchId.toString())}
+                    onClick={() => {
+                      setSelectedMatchId(match.matchId.toString());
+                      // Scroll to comment form
+                      document.querySelector('.comment-form')?.scrollIntoView({ behavior: 'smooth' });
+                    }}
                     className="btn btn-sm btn-outline"
                     disabled={loading}
                   >
@@ -164,25 +183,57 @@ const UserDashboard = () => {
         {/* Add Comment Form */}
         <div className="comment-form">
           <h4>Add New Comment</h4>
-          <div className="form-group">
-            <label>Match ID</label>
-            <input
-              type="number"
-              placeholder="Enter Match ID"
-              value={selectedMatchId}
-              onChange={(e) => setSelectedMatchId(e.target.value)}
-              className="form-input"
-            />
+          <div className="form-grid">
+            <div className="form-group">
+              <label>Match ID</label>
+              <input
+                type="number"
+                placeholder="Enter Match ID"
+                value={selectedMatchId}
+                onChange={(e) => setSelectedMatchId(e.target.value)}
+                className="form-input"
+              />
+            </div>
+            
+            <div className="form-group">
+              <label>Username*</label>
+              <input
+                type="text"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="form-input"
+                required
+              />
+            </div>
           </div>
           
           <div className="form-group">
-            <label>Your Comment</label>
+            <label>Rating (1-5 stars)</label>
+            <div className="rating-container">
+              <select
+                value={rating}
+                onChange={(e) => setRating(parseInt(e.target.value))}
+                className="form-input rating-select"
+              >
+                <option value={1}>⭐ (1 star)</option>
+                <option value={2}>⭐⭐ (2 stars)</option>
+                <option value={3}>⭐⭐⭐ (3 stars)</option>
+                <option value={4}>⭐⭐⭐⭐ (4 stars)</option>
+                <option value={5}>⭐⭐⭐⭐⭐ (5 stars)</option>
+              </select>
+            </div>
+          </div>
+          
+          <div className="form-group">
+            <label>Your Comment*</label>
             <textarea
               placeholder="Share your thoughts about this match..."
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
               className="form-input comment-textarea"
               rows="4"
+              required
             />
           </div>
           
@@ -211,14 +262,24 @@ const UserDashboard = () => {
           <h3>Comments for Match {selectedMatchId} ({comments.length})</h3>
           <div className="comments-list">
             {comments.map((comment, index) => (
-              <div key={index} className="comment-item">
-                <div className="comment-text">{comment.comment || comment}</div>
-                <div className="comment-meta">
+              <div key={comment.commentid || index} className="comment-item">
+                <div className="comment-header">
+                  <div className="comment-user">
+                    <strong>{comment.username || 'Anonymous'}</strong>
+                    {comment.rating && (
+                      <span className="comment-rating">
+                        {'⭐'.repeat(comment.rating)}
+                      </span>
+                    )}
+                  </div>
                   {comment.timestamp && (
                     <span className="comment-time">
                       {new Date(comment.timestamp).toLocaleString()}
                     </span>
                   )}
+                </div>
+                <div className="comment-text">
+                  {comment.text || comment.comment || comment}
                 </div>
               </div>
             ))}
@@ -231,9 +292,15 @@ const UserDashboard = () => {
         <h4>User Instructions:</h4>
         <ul>
           <li><strong>View Matches:</strong> Click "Load All Matches" to see all available matches</li>
-          <li><strong>View Comments:</strong> Click "View Comments" on any match card to see existing comments</li>
-          <li><strong>Add Comment:</strong> Enter a Match ID and your comment, then click "Add Comment"</li>
-          <li><strong>Quick Comment:</strong> Click "Add Comment" on a match card to auto-fill the Match ID</li>
+          <li><strong>View Comments:</strong> Click "View Comments" on any match card to see existing comments with ratings and usernames</li>
+          <li><strong>Add Comment:</strong> Fill in all required fields:</li>
+          <ul>
+            <li>Match ID (required)</li>
+            <li>Username (required)</li>
+            <li>Rating (1-5 stars)</li>
+            <li>Comment text (required)</li>
+          </ul>
+          <li><strong>Quick Comment:</strong> Click "Add Comment" on a match card to auto-fill the Match ID and scroll to the form</li>
         </ul>
       </div>
     </div>
