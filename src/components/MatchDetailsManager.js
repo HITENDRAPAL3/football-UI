@@ -3,6 +3,7 @@ import matchService from '../services/matchService';
 
 const MatchDetailsManager = () => {
   const [currentMatch, setCurrentMatch] = useState(null);
+  const [allMatches, setAllMatches] = useState([]); // New state for all matches
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState(''); // 'success' or 'error'
@@ -141,8 +142,27 @@ const MatchDetailsManager = () => {
       await matchService.deleteMatchDetails(matchId);
       showMessage('Match details deleted successfully!', 'success');
       clearForm();
+      // Refresh all matches list if it's currently displayed
+      if (allMatches.length > 0) {
+        await handleGetAllMatches();
+      }
     } catch (error) {
       showMessage(`Error: ${error.message}`, 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get all matches
+  const handleGetAllMatches = async () => {
+    setLoading(true);
+    try {
+      const matches = await matchService.getAllMatchDetails();
+      setAllMatches(matches);
+      showMessage(`Loaded ${matches.length} matches successfully!`, 'success');
+    } catch (error) {
+      showMessage(`Error: ${error.message}`, 'error');
+      setAllMatches([]);
     } finally {
       setLoading(false);
     }
@@ -194,6 +214,63 @@ const MatchDetailsManager = () => {
               <strong>{currentMatch.awayTeamName}</strong>
               <span className="score">{currentMatch.awayTeamScore}</span>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Get All Matches Section */}
+      <div className="form-section">
+        <h3>All Match Details</h3>
+        <div className="input-group">
+          <button 
+            onClick={handleGetAllMatches}
+            disabled={loading}
+            className="btn btn-info"
+          >
+            {loading ? 'Loading...' : 'Get All Matches'}
+          </button>
+          {allMatches.length > 0 && (
+            <button 
+              onClick={() => setAllMatches([])}
+              disabled={loading}
+              className="btn btn-secondary"
+            >
+              Clear List
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* All Matches Display */}
+      {allMatches.length > 0 && (
+        <div className="all-matches">
+          <h3>All Matches ({allMatches.length})</h3>
+          <div className="matches-grid">
+            {allMatches.map((match) => (
+              <div key={match.matchId} className="match-card">
+                <div className="match-id">Match ID: {match.matchId}</div>
+                <div className="match-display">
+                  <div className="team">
+                    <strong>{match.homeTeamName}</strong>
+                    <span className="score">{match.homeTeamScore || 0}</span>
+                  </div>
+                  <div className="vs">VS</div>
+                  <div className="team">
+                    <strong>{match.awayTeamName}</strong>
+                    <span className="score">{match.awayTeamScore || 0}</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => {
+                    setMatchId(match.matchId.toString());
+                    handleGetMatch();
+                  }}
+                  className="btn btn-sm btn-outline"
+                >
+                  Load Match
+                </button>
+              </div>
+            ))}
           </div>
         </div>
       )}
@@ -290,6 +367,7 @@ const MatchDetailsManager = () => {
         <h4>Instructions:</h4>
         <ul>
           <li><strong>Get:</strong> Enter Match ID and click "Get Match" to load existing data</li>
+          <li><strong>Get All:</strong> Click "Get All Matches" to load and display all matches. Click "Load Match" on any card to edit it</li>
           <li><strong>Add:</strong> Fill in Match ID, team names (required), and scores (optional), then click "Add Match"</li>
           <li><strong>Update:</strong> Enter Match ID, modify any fields you want to change, then click "Update Match"</li>
           <li><strong>Delete:</strong> Enter Match ID and click "Delete Match" (confirmation required)</li>

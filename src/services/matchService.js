@@ -87,6 +87,27 @@ class MatchService {
       throw error;
     }
   }
+
+  // Get all match details
+  async getAllMatchDetails() {
+    try {
+      const response = await fetch(`${API_BASE_URL}/getAllMatchDetails`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to get all match details: ${response.status}`);
+      }
+      
+      return await response.json();
+    } catch (error) {
+      console.error('Error getting all match details:', error);
+      throw error;
+    }
+  }
 }
 
 export default new MatchService();
